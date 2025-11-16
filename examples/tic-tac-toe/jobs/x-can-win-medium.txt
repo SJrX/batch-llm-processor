@@ -1,0 +1,6 @@
+Difficulty: Medium
+Your Player Marker X
+
+XOO
+-X-
+---
