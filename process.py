@@ -194,6 +194,7 @@ class BatchProcessor:
             "timestamp": time.time()
         }
         self.state_file.write_text(json.dumps(state, indent=2))
+        print(f"State saved to: {self.state_file}")
 
     def clear_state(self):
         """Clear the state file"""
@@ -579,7 +580,7 @@ class BatchProcessor:
             # Check for existing batch in progress
             state = self.load_state()
 
-            if state:
+            if state and state["batch_id"] != "pending":
                 batch_id = state["batch_id"]
                 job_files = state["job_files"]
                 conversations = state.get("conversations", {})
@@ -592,6 +593,12 @@ class BatchProcessor:
                     print("Batch not completed yet")
                     return
             else:
+                # If state exists with "pending" batch_id, restore conversations
+                if state and state["batch_id"] == "pending":
+                    conversations = state.get("conversations", {})
+                    print(f"Resuming from saved state (turn {turn})")
+
+
                 # Create batch requests
                 requests = self.create_batch_requests(pending_jobs, system_prompt, conversations)
 
@@ -636,10 +643,14 @@ class BatchProcessor:
 
             # Update pending jobs to only those needing continuation
             pending_job_ids = set(results["needs_tool_execution"].keys())
-            pending_jobs = [j for j in pending_jobs if j.stem in pending_job_ids]
+            pending_jobs = [j for j in pending_jobs if self.get_short_id(j.name) in pending_job_ids]
 
-            # Clear state for next turn
-            self.clear_state()
+            # Save state with updated conversations before clearing
+            # This ensures we can resume if interrupted between turns
+            if pending_jobs:
+                job_filenames = [job.name for job in pending_jobs]
+                # Use a placeholder batch_id - will be updated when next batch is created
+                self.save_state("pending", job_filenames, conversations)
 
         if turn >= max_turns:
             elapsed_time = time.time() - start_time

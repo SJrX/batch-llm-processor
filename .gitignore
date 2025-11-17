@@ -1,2 +1,3 @@
 .envrc
 examples/*/results
+.batch_state.json
